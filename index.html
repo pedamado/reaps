@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Processing Suite v1.3</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/carbon-components/css/carbon-components.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+      body,
+      html {
+        height: 100%;
+        margin: 0;
+        font-family: "IBM Plex Sans", sans-serif;
+        overflow: hidden;
+        background-color: #f4f4f4;
+      }
+      .container {
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+      }
+
+      /* --- LEFT PANE --- */
+      .left-pane {
+        width: 35%;
+        background-color: #f4f4f4;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid #e0e0e0;
+        z-index: 10;
+      }
+      .bx--tabs__nav {
+        display: flex;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        background: #e0e0e0;
+        flex-wrap: wrap;
+      }
+      .bx--tabs__nav-item {
+        flex: 1;
+        cursor: pointer;
+        padding: 1rem 0.5rem;
+        text-align: center;
+        font-weight: 600;
+        color: #525252;
+        border-bottom: 3px solid transparent;
+        user-select: none;
+        font-size: 0.8rem;
+        min-width: 80px;
+      }
+      .bx--tabs__nav-item:hover {
+        background-color: #d0d0d0;
+        color: #161616;
+      }
+      .bx--tabs__nav-item.selected {
+        color: #0f62fe;
+        border-bottom: 3px solid #0f62fe;
+        background-color: #f4f4f4;
+      }
+
+      .tab-content {
+        padding: 2rem;
+        overflow-y: auto;
+        display: none;
+        flex-grow: 1;
+      }
+      .tab-content.active {
+        display: block;
+      }
+
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #161616;
+      }
+      p {
+        font-size: 14px;
+        color: #525252;
+        margin-bottom: 2rem;
+        line-height: 1.5;
+      }
+
+      .drop-zone {
+        border: 2px dashed #8d8d8d;
+        background-color: #ffffff;
+        padding: 3rem 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-bottom: 1.5rem;
+      }
+      .drop-zone:hover,
+      .drop-zone.dragover {
+        border-color: #0f62fe;
+        background-color: #edf5ff;
+      }
+
+      .status-msg {
+        margin-bottom: 1rem;
+        font-size: 14px;
+        min-height: 20px;
+        word-break: break-all;
+      }
+      .status-success {
+        color: #24a148;
+      }
+      .status-error {
+        color: #da1e28;
+      }
+      .status-loading {
+        color: #0f62fe;
+      }
+
+      .bx--btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.875rem 1rem;
+        font-size: 0.875rem;
+        border: none;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 10px;
+      }
+      .bx--btn--secondary {
+        background-color: #393939;
+        color: #fff;
+      }
+      .bx--btn--download {
+        background-color: #198038;
+        color: white;
+      }
+      .bx--btn:disabled {
+        background-color: #c6c6c6;
+        cursor: not-allowed;
+        color: #8d8d8d;
+      }
+
+      /* --- RIGHT PANE --- */
+      .right-pane {
+        flex-grow: 1;
+        background-color: #ffffff;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .right-view {
+        display: none;
+        height: 100%;
+        flex-direction: column;
+      }
+      .right-view.active {
+        display: flex;
+      }
+
+      .preview-header {
+        padding: 1rem 2rem;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #fff;
+        font-weight: 600;
+      }
+      #previewTextarea {
+        width: 100%;
+        flex-grow: 1;
+        border: none;
+        padding: 2rem;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        resize: none;
+        outline: none;
+      }
+
+      .table-container {
+        flex-grow: 1;
+        overflow: auto;
+      }
+      .bx--data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      .bx--data-table th {
+        background-color: #e0e0e0;
+        color: #161616;
+        padding: 1rem;
+        text-align: left;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        cursor: pointer; /* Clickable headers */
+        user-select: none;
+      }
+      .bx--data-table th:hover {
+        background-color: #d0d0d0;
+      }
+      .bx--data-table th span.sort-icon {
+        margin-left: 5px;
+        font-size: 10px;
+        color: #525252;
+      }
+      .bx--data-table td {
+        padding: 0.8rem 1rem;
+        border-bottom: 1px solid #e0e0e0;
+        color: #525252;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="left-pane">
+        <ul class="bx--tabs__nav">
+          <li class="bx--tabs__nav-item" onclick="switchTab('converter')">
+            MBOX/ZIP
+          </li>
+          <li class="bx--tabs__nav-item" onclick="switchTab('parser')">
+            Header Parser
+          </li>
+          <li class="bx--tabs__nav-item" onclick="switchTab('merger')">
+            Merger (Keep All)
+          </li>
+          <li class="bx--tabs__nav-item" onclick="switchTab('deduper')">
+            CSV Deduper
+          </li>
+        </ul>
+
+        <div id="tab-converter" class="tab-content">
+          <h1>Archive Converter</h1>
+          <p>
+            Convert MBOX/ZIP to clean text. Removes Base64 attachments
+            automatically.
+          </p>
+          <div id="dropZoneConverter" class="drop-zone">
+            <div>Drag ZIP or MBOX here</div>
+            <button
+              class="bx--btn bx--btn--secondary"
+              onclick="document.getElementById('fileInputConverter').click()"
+            >
+              Select File
+            </button>
+            <input
+              type="file"
+              id="fileInputConverter"
+              hidden
+              accept=".zip,.mbox,.txt"
+            />
+          </div>
+          <div id="statusConverter" class="status-msg"></div>
+          <button id="btnConv" class="bx--btn bx--btn--download" disabled>
+            Download Text
+          </button>
+        </div>
+
+        <div id="tab-parser" class="tab-content">
+          <h1>Email Header Parser</h1>
+          <p>
+            Extracts human emails from raw text dumps. Filters out machine logs
+            and technical junk.
+          </p>
+          <div id="dropZoneParser" class="drop-zone">
+            <div>Drag Text or CSV here</div>
+            <button
+              class="bx--btn bx--btn--secondary"
+              onclick="document.getElementById('fileInputParser').click()"
+            >
+              Select File
+            </button>
+            <input type="file" id="fileInputParser" hidden accept=".txt,.csv" />
+          </div>
+          <div id="statusParser" class="status-msg"></div>
+          <button id="btnParsLeft" class="bx--btn bx--btn--download" disabled>
+            Download CSV
+          </button>
+        </div>
+
+        <div id="tab-merger" class="tab-content">
+          <h1>Merge Files</h1>
+          <p>
+            Stack multiple CSV files into one master list. <br />
+            <b>Note:</b> This keeps all entries, including duplicates.
+          </p>
+          <div id="dropZoneMerger" class="drop-zone">
+            <div>Drag multiple CSVs here</div>
+            <button
+              class="bx--btn bx--btn--secondary"
+              onclick="document.getElementById('fileInputMerger').click()"
+            >
+              Select Files
+            </button>
+            <input
+              type="file"
+              id="fileInputMerger"
+              hidden
+              accept=".csv"
+              multiple
+            />
+          </div>
+          <div id="statusMerger" class="status-msg"></div>
+          <button id="btnMergeLeft" class="bx--btn bx--btn--download" disabled>
+            Download Merged CSV
+          </button>
+        </div>
+
+        <div id="tab-deduper" class="tab-content">
+          <h1>CSV Deduper</h1>
+          <p>
+            Upload a single CSV to remove duplicate emails. <br />
+            Analyzes unique email addresses and keeps the best name match.
+          </p>
+          <div id="dropZoneDeduper" class="drop-zone">
+            <div>Drag Merged CSV here</div>
+            <button
+              class="bx--btn bx--btn--secondary"
+              onclick="document.getElementById('fileInputDeduper').click()"
+            >
+              Select CSV
+            </button>
+            <input type="file" id="fileInputDeduper" hidden accept=".csv" />
+          </div>
+          <div id="statusDeduper" class="status-msg"></div>
+          <button id="btnDedupeLeft" class="bx--btn bx--btn--download" disabled>
+            Download Clean CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="right-pane">
+        <div id="view-converter" class="right-view">
+          <div class="preview-header"><span>Text Preview</span></div>
+          <textarea
+            id="previewTextarea"
+            readonly
+            placeholder="No file loaded..."
+          ></textarea>
+        </div>
+
+        <div id="view-parser" class="right-view">
+          <div class="preview-header">
+            <span>Parsed Table</span>
+            <button
+              id="btnParsRight"
+              class="bx--btn bx--btn--download"
+              style="width: auto; padding: 0.5rem 1rem; margin: 0"
+              disabled
+            >
+              Download CSV
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="bx--data-table" id="tableParser">
+              <thead>
+                <tr>
+                  <th onclick="sortTable('parser', 'firstName')">
+                    First Name <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortTable('parser', 'familyName')">
+                    Family Name <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortTable('parser', 'email')">
+                    Email <span class="sort-icon"></span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="bodyParser"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="view-merger" class="right-view">
+          <div class="preview-header">
+            <span>Merged Data (All Entries)</span>
+            <button
+              id="btnMergeRight"
+              class="bx--btn bx--btn--download"
+              style="width: auto; padding: 0.5rem 1rem; margin: 0"
+              disabled
+            >
+              Download Merged CSV
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="bx--data-table" id="tableMerger">
+              <thead>
+                <tr>
+                  <th onclick="sortTable('merger', 'firstName')">
+                    First Name <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortTable('merger', 'familyName')">
+                    Family Name <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortTable('merger', 'email')">
+                    Email <span class="sort-icon"></span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="bodyMerger"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="view-deduper" class="right-view">
+          <div class="preview-header">
+            <span>Deduped Data (Unique Emails)</span>
+            <button
+              id="btnDedupeRight"
+              class="bx--btn bx--btn--download"
+              style="width: auto; padding: 0.5rem 1rem; margin: 0"
+              disabled
+            >
+              Download Clean CSV
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="bx--data-table" id="tableDeduper">
+              <thead>
+                <tr>
+                  <th onclick="sortTable('deduper', 'firstName')">
+                    First Name <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortTable('deduper', 'familyName')">
+                    Family Name <span class="sort-icon"></span>
+                  </th>
+                  <th onclick="sortTable('deduper', 'email')">
+                    Email <span class="sort-icon"></span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="bodyDeduper"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- STATE MANAGEMENT ---
+      let state = {
+        converter: { data: null, filename: "converted" },
+        parser: {
+          data: [],
+          filename: "parsed",
+          sortCol: "email",
+          sortAsc: true,
+        },
+        merger: {
+          data: [],
+          filename: "merged_full",
+          sortCol: "email",
+          sortAsc: true,
+        },
+        deduper: {
+          data: [],
+          filename: "deduped",
+          sortCol: "email",
+          sortAsc: true,
+        },
+      };
+
+      // --- TAB SYSTEM (PERSISTENT) ---
+      function switchTab(tabName) {
+        localStorage.setItem("activeTab", tabName);
+        const tabs = ["converter", "parser", "merger", "deduper"];
+        const navItems = document.querySelectorAll(".bx--tabs__nav-item");
+
+        tabs.forEach((t, i) => {
+          document
+            .getElementById(`tab-${t}`)
+            .classList.toggle("active", t === tabName);
+          document
+            .getElementById(`view-${t}`)
+            .classList.toggle("active", t === tabName);
+          if (t === tabName) navItems[i].classList.add("selected");
+          else navItems[i].classList.remove("selected");
+        });
+      }
+
+      window.onload = () => {
+        const savedTab = localStorage.getItem("activeTab");
+        switchTab(savedTab || "converter");
+      };
+
+      // --- SHARED UTILS ---
+      const setStatus = (el, msg, type) => {
+        el.textContent = msg;
+        el.className = `status-msg status-${type}`;
+      };
+      const readFile = (file) =>
+        new Promise((resolve) => {
+          const r = new FileReader();
+          r.onload = (e) => resolve(e.target.result);
+          r.readAsText(file);
+        });
+
+      // --- SORTING FUNCTIONALITY ---
+      function sortTable(type, column) {
+        const currentData = state[type].data;
+        if (!currentData || currentData.length === 0) return;
+
+        // Toggle sort order if clicking the same column
+        if (state[type].sortCol === column) {
+          state[type].sortAsc = !state[type].sortAsc;
+        } else {
+          state[type].sortCol = column;
+          state[type].sortAsc = true; // Default to Ascending
+        }
+
+        const asc = state[type].sortAsc;
+
+        currentData.sort((a, b) => {
+          const valA = (a[column] || "").toLowerCase();
+          const valB = (b[column] || "").toLowerCase();
+          if (valA < valB) return asc ? -1 : 1;
+          if (valA > valB) return asc ? 1 : -1;
+          return 0;
+        });
+
+        // Update UI
+        renderTable(
+          currentData,
+          `body${type.charAt(0).toUpperCase() + type.slice(1)}`
+        );
+        updateSortIcons(type, column, asc);
+      }
+
+      function updateSortIcons(type, activeCol, isAsc) {
+        const tableId = `table${type.charAt(0).toUpperCase() + type.slice(1)}`;
+        const headers = document.querySelectorAll(`#${tableId} th`);
+
+        // Reset all icons
+        headers.forEach((th) => {
+          const icon = th.querySelector(".sort-icon");
+          if (icon) icon.textContent = "";
+        });
+
+        // Set active icon
+        // Index mapping: 0=First, 1=Family, 2=Email
+        let index = -1;
+        if (activeCol === "firstName") index = 0;
+        if (activeCol === "familyName") index = 1;
+        if (activeCol === "email") index = 2;
+
+        if (index >= 0 && headers[index]) {
+          headers[index].querySelector(".sort-icon").innerHTML = isAsc
+            ? " &#9650;"
+            : " &#9660;";
+        }
+      }
+
+      // ======================================================
+      // TAB 1: CONVERTER (Zip/Mbox -> Clean Txt)
+      // ======================================================
+      const dzConv = document.getElementById("dropZoneConverter");
+      const inpConv = document.getElementById("fileInputConverter");
+
+      const setupDrag = (elem, handler) => {
+        elem.ondragover = (e) => {
+          e.preventDefault();
+          elem.classList.add("dragover");
+        };
+        elem.ondragleave = () => elem.classList.remove("dragover");
+        elem.ondrop = (e) => {
+          e.preventDefault();
+          elem.classList.remove("dragover");
+          handler(e.dataTransfer.files);
+        };
+      };
+
+      setupDrag(dzConv, (files) => handleConv(files[0]));
+      inpConv.onchange = (e) => handleConv(e.target.files[0]);
+
+      async function handleConv(file) {
+        if (!file) return;
+        setStatus(
+          document.getElementById("statusConverter"),
+          "Processing...",
+          "loading"
+        );
+        state.converter.filename =
+          file.name.substring(0, file.name.lastIndexOf(".")) || file.name;
+
+        try {
+          let text = "";
+          if (file.name.endsWith(".zip")) {
+            const zip = await new JSZip().loadAsync(file);
+            const promises = [];
+            zip.forEach((path, entry) => {
+              if (!entry.dir)
+                promises.push(
+                  entry
+                    .async("string")
+                    .then(
+                      (t) =>
+                        (text += `\n--- FILE: ${path} ---\n${cleanBase64(t)}\n`)
+                    )
+                );
+            });
+            await Promise.all(promises);
+          } else {
+            text = cleanBase64(await readFile(file));
+          }
+          state.converter.data = text;
+          document.getElementById("previewTextarea").value =
+            text.substring(0, 5000) + "...";
+          const btn = document.getElementById("btnConv");
+          btn.disabled = false;
+          btn.innerText = `Download ${state.converter.filename}.txt`;
+          setStatus(
+            document.getElementById("statusConverter"),
+            "Success!",
+            "success"
+          );
+
+          btn.onclick = () =>
+            downloadTxt(state.converter.data, state.converter.filename);
+        } catch (e) {
+          setStatus(
+            document.getElementById("statusConverter"),
+            "Error: " + e.message,
+            "error"
+          );
+        }
+      }
+
+      function cleanBase64(text) {
+        return text
+          .split(/\r?\n/)
+          .filter((line) => {
+            const t = line.trim();
+            if (
+              t.length > 60 &&
+              !t.includes(" ") &&
+              /^[a-zA-Z0-9+/=]+$/.test(t)
+            )
+              return false;
+            return true;
+          })
+          .join("\n");
+      }
+
+      // ======================================================
+      // TAB 2: PARSER (Fixed Logic)
+      // ======================================================
+      const dzPars = document.getElementById("dropZoneParser");
+      const inpPars = document.getElementById("fileInputParser");
+
+      setupDrag(dzPars, (files) => handlePars(files[0]));
+      inpPars.onchange = (e) => handlePars(e.target.files[0]);
+
+      async function handlePars(file) {
+        if (!file) return;
+        setStatus(
+          document.getElementById("statusParser"),
+          "Parsing...",
+          "loading"
+        );
+        state.parser.filename =
+          file.name.substring(0, file.name.lastIndexOf(".")) || file.name;
+
+        try {
+          const text = await readFile(file);
+          setTimeout(() => {
+            state.parser.data = parseEmails(text);
+            renderTable(state.parser.data, "bodyParser");
+
+            const btns = [
+              document.getElementById("btnParsLeft"),
+              document.getElementById("btnParsRight"),
+            ];
+            btns.forEach((b) => {
+              b.disabled = false;
+              b.innerText = `Download CSV`;
+              b.onclick = () =>
+                downloadCSV(state.parser.data, state.parser.filename);
+            });
+
+            setStatus(
+              document.getElementById("statusParser"),
+              `Found ${state.parser.data.length} valid emails.`,
+              "success"
+            );
+          }, 50);
+        } catch (e) {
+          setStatus(
+            document.getElementById("statusParser"),
+            "Error: " + e.message,
+            "error"
+          );
+        }
+      }
+
+      function parseEmails(text) {
+        const unique = new Map();
+        const lines = text.split(/\r?\n/);
+
+        const badKeywords = [
+          "return-path",
+          "received",
+          "message-id",
+          "boundary=",
+          "esmtp",
+          "with",
+          "id",
+          "content-type",
+          "mime-version",
+          "x-mailer",
+          "x-sender",
+          "reply-to",
+          "mailer-daemon",
+          "postmaster",
+          "noreply",
+          "no-reply",
+          "do-not-reply",
+          "bounce",
+          "notification",
+          "alert",
+          "automated",
+          "system",
+          "admin",
+          "daemon",
+          "delivery",
+          "support",
+          "helpdesk",
+          "info@",
+          "newsletter",
+          "facebook",
+          "linkedin",
+          "twitter",
+          "instagram",
+          "google",
+          "microsoft",
+          "amazonaws",
+          "azure",
+          "update",
+          "digest",
+          "group",
+          "list",
+          "feed",
+          "abuse",
+          "smtpin",
+          "horde",
+          "unknown.domain",
+        ];
+
+        const technicalDomains = [
+          "amazonses.com",
+          "bounces.google.com",
+          "docs-share.google.com",
+          "plus.google.com",
+          "listserv",
+          "email.android.com",
+          "email.dropbox.com",
+          "sentry.io",
+          "cleanmx.pt",
+          "improxy.com",
+          "out02.byside.com",
+          "relay.luzsaude.net",
+          "protection.outlook.com",
+          "prod.outlook.com",
+          "templateTenant",
+          "googlegroups.com",
+          "hosting37.serverhs.org",
+          "sparkpost",
+          "tudoporemail.com.br",
+          "webserver.pt",
+          "ppops.net",
+          "mailjet.com",
+          "lan",
+        ];
+
+        const serverSignatures = [
+          "ex05",
+          "ex06",
+          "ex07",
+          "ex08",
+          "hosting37",
+          "interno",
+        ];
+
+        const regex =
+          /"?([^"<]*?)"?\s*<([^>]+)>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i;
+
+        lines.forEach((line) => {
+          if (!line.includes("@") || line.length > 2000) return;
+
+          const match = line.match(regex);
+          if (!match) return;
+
+          let name = (match[1] || "")
+            .trim()
+            .replace(/^(from|to|cc|subject):/i, "")
+            .replace(/['"]/g, "")
+            .trim();
+          let email = (match[2] || match[3] || "").trim();
+
+          // --- CLEAN EMAIL ---
+          if (email.startsWith("3D") || email.startsWith("2E"))
+            email = email.substring(2);
+          if (
+            email.startsWith("20") &&
+            email.length > 5 &&
+            /^[a-zA-Z]/.test(email.charAt(2))
+          )
+            email = email.substring(2);
+          if (email.toLowerCase().startsWith("mailto:"))
+            email = email.substring(7);
+
+          email = email
+            .toLowerCase()
+            .replace(/[>"),;]+$/, "")
+            .trim();
+
+          if (!email.includes("@")) return;
+          const [local, domain] = email.split("@");
+          if (!local || !domain) return;
+
+          // Filters
+          if (technicalDomains.some((d) => domain.includes(d))) return;
+          if (serverSignatures.some((s) => domain.includes(s))) return;
+          if (badKeywords.some((w) => email.includes(w))) return;
+          if (
+            local.includes("$") ||
+            /^\d{4,}/.test(local) ||
+            local.startsWith("!&!") ||
+            (local.length > 25 && !local.includes("."))
+          )
+            return;
+
+          // --- CLEAN NAME ---
+          if (badKeywords.some((w) => name.toLowerCase().includes(w)))
+            name = "";
+          name = name
+            .replace(/&lt;/g, "")
+            .replace(/&gt;/g, "")
+            .replace(/&nbsp;/g, " ")
+            .replace(/,sans-serif>/g, "")
+            .trim();
+          if (name.includes("@")) name = "";
+
+          const parts = name.split(/\s+/);
+          let firstName = "";
+          let familyName = "";
+
+          if (parts.length > 0 && name !== "") {
+            if (name.includes(",")) {
+              const commaParts = name.split(",");
+              familyName = commaParts[0].trim();
+              firstName = commaParts.slice(1).join(" ").trim();
+            } else {
+              firstName = parts.slice(0, -1).join(" ");
+              familyName = parts[parts.length - 1];
+              if (!firstName) {
+                firstName = familyName;
+                familyName = "";
+              }
+            }
+          }
+
+          if (unique.has(email)) {
+            const ex = unique.get(email);
+            if (
+              (!ex.firstName && firstName) ||
+              (!ex.familyName && familyName)
+            ) {
+              unique.set(email, {
+                firstName: firstName || ex.firstName,
+                familyName: familyName || ex.familyName,
+                email,
+              });
+            }
+          } else {
+            unique.set(email, { firstName, familyName, email });
+          }
+        });
+
+        return Array.from(unique.values()).sort((a, b) =>
+          a.email.localeCompare(b.email)
+        );
+      }
+
+      // ======================================================
+      // TAB 3: MERGER (Multiple Files -> KEEP ALL)
+      // ======================================================
+      const dzMerge = document.getElementById("dropZoneMerger");
+      const inpMerge = document.getElementById("fileInputMerger");
+
+      setupDrag(dzMerge, (files) => handleMerge(files));
+      inpMerge.onchange = (e) => handleMerge(e.target.files);
+
+      async function handleMerge(files) {
+        if (!files || files.length === 0) return;
+        setStatus(
+          document.getElementById("statusMerger"),
+          `Processing ${files.length} files...`,
+          "loading"
+        );
+
+        try {
+          let mergedList = [];
+
+          for (let f of files) {
+            const text = await readFile(f);
+            const rows = parseCSV(text);
+            mergedList = mergedList.concat(rows);
+          }
+
+          // Simple sort by email
+          mergedList.sort((a, b) => a.email.localeCompare(b.email));
+
+          state.merger.data = mergedList;
+          renderTable(mergedList, "bodyMerger");
+
+          const btns = [
+            document.getElementById("btnMergeLeft"),
+            document.getElementById("btnMergeRight"),
+          ];
+          btns.forEach((b) => {
+            b.disabled = false;
+            b.onclick = () =>
+              downloadCSV(state.merger.data, "merged_full_list");
+          });
+
+          setStatus(
+            document.getElementById("statusMerger"),
+            `Merged ${mergedList.length} rows (Duplicates kept).`,
+            "success"
+          );
+        } catch (e) {
+          setStatus(
+            document.getElementById("statusMerger"),
+            "Error: " + e.message,
+            "error"
+          );
+        }
+      }
+
+      // ======================================================
+      // TAB 4: DEDUPER (Single Merged File -> DEDUPE)
+      // ======================================================
+      const dzDedupe = document.getElementById("dropZoneDeduper");
+      const inpDedupe = document.getElementById("fileInputDeduper");
+
+      setupDrag(dzDedupe, (files) => handleDedupe(files[0]));
+      inpDedupe.onchange = (e) => handleDedupe(e.target.files[0]);
+
+      async function handleDedupe(file) {
+        if (!file) return;
+        setStatus(
+          document.getElementById("statusDeduper"),
+          "Deduping...",
+          "loading"
+        );
+        state.deduper.filename = file.name.replace(".csv", "_clean");
+
+        try {
+          const text = await readFile(file);
+          const rows = parseCSV(text);
+          const uniqueMap = new Map();
+
+          rows.forEach((row) => {
+            if (!row.email || !row.email.includes("@")) return;
+            const email = row.email.toLowerCase().trim();
+
+            // Scoring to prefer entries with names
+            let score = 0;
+            if (row.firstName && row.familyName) score = 3;
+            else if (row.firstName) score = 2;
+            else if (row.familyName) score = 1;
+
+            if (!uniqueMap.has(email)) {
+              uniqueMap.set(email, { ...row, _score: score });
+            } else {
+              const existing = uniqueMap.get(email);
+              // Keep the one with better data
+              if (score > existing._score) {
+                uniqueMap.set(email, { ...row, _score: score });
+              }
+            }
+          });
+
+          // Convert to Array
+          const sortedData = Array.from(uniqueMap.values())
+            .map(({ _score, ...rest }) => rest)
+            .sort((a, b) => a.email.localeCompare(b.email));
+
+          state.deduper.data = sortedData;
+          renderTable(sortedData, "bodyDeduper");
+
+          const btns = [
+            document.getElementById("btnDedupeLeft"),
+            document.getElementById("btnDedupeRight"),
+          ];
+          btns.forEach((b) => {
+            b.disabled = false;
+            b.onclick = () =>
+              downloadCSV(state.deduper.data, state.deduper.filename);
+          });
+
+          setStatus(
+            document.getElementById("statusDeduper"),
+            `Cleaned down to ${sortedData.length} unique emails.`,
+            "success"
+          );
+        } catch (e) {
+          setStatus(
+            document.getElementById("statusDeduper"),
+            "Error: " + e.message,
+            "error"
+          );
+        }
+      }
+
+      function parseCSV(text) {
+        const lines = text.split(/\r?\n/);
+        const data = [];
+        let startIndex =
+          lines[0] && lines[0].toLowerCase().includes("first name") ? 1 : 0;
+
+        for (let i = startIndex; i < lines.length; i++) {
+          const match = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+          if (match) {
+            const clean = match.map((c) =>
+              c.replace(/^"|"$/g, "").replace(/""/g, '"').trim()
+            );
+            const emailIndex = clean.findIndex((c) => c.includes("@"));
+            if (emailIndex !== -1) {
+              const email = clean[emailIndex];
+              let firstName = "";
+              let familyName = "";
+
+              if (emailIndex === 2) {
+                firstName = clean[0];
+                familyName = clean[1];
+              } else if (emailIndex === 1) {
+                const parts = clean[0].split(" ");
+                firstName = parts[0];
+                familyName = parts.slice(1).join(" ");
+              }
+
+              if (firstName === email) firstName = "";
+              if (familyName === email) familyName = "";
+
+              data.push({ firstName, familyName, email });
+            }
+          }
+        }
+        return data;
+      }
+
+      // --- RENDER & DOWNLOAD ---
+      function renderTable(data, bodyId) {
+        const tbody = document.getElementById(bodyId);
+        tbody.innerHTML = "";
+        const limit = Math.min(data.length, 500);
+
+        let html = "";
+        for (let i = 0; i < limit; i++) {
+          html += `<tr><td>${i + 1}</td><td>${data[i].firstName}</td><td>${
+            data[i].familyName
+          }</td><td>${data[i].email}</td></tr>`;
+        }
+        if (data.length > limit)
+          html += `<tr><td colspan="4" style="text-align:center">...${
+            data.length - limit
+          } more rows (Download to see all)...</td></tr>`;
+        tbody.innerHTML = html;
+      }
+
+      function downloadTxt(content, name) {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(
+          new Blob([content], { type: "text/plain" })
+        );
+        a.download = name + ".txt";
+        a.click();
+      }
+
+      function downloadCSV(data, name) {
+        let csv = "First Name(s),Family Name(s),Email\n";
+        data.forEach(
+          (r) =>
+            (csv += `"${r.firstName.replace(
+              /"/g,
+              '""'
+            )}","${r.familyName.replace(/"/g, '""')}","${r.email}"\n`)
+        );
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(
+          new Blob([csv], { type: "text/csv;charset=utf-8;" })
+        );
+        a.download = name + ".csv";
+        a.click();
+      }
+    </script>
+  </body>
+</html>
